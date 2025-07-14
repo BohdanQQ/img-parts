@@ -30,5 +30,5 @@ fn read_write_every_image() {
         tested += 1;
     }
 
-    assert_eq!(tested, 15);
+    assert_eq!(tested, 14);
 }

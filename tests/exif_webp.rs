@@ -28,19 +28,19 @@ fn extract_webp_adobergb() {
 }
 
 #[test]
-fn inject_webp_srgb() {
-    inject_webp_result(
-        "P1133897.webp",
-        "P1133897_sRGB_exif.out.webp",
-        "./P1133897_sRGB.exif",
+fn add_srgb_exif_to_vp8x_with_icc() {
+    inject_webp_exif(
+        "P1133897.out.webp",
+        "P1133897_sRGB_exif_Adobe_icc.out.webp",
+        "P1133897_sRGB.exif",
     );
 }
 
 #[test]
-fn inject_webp_adobergb() {
-    inject_webp_result(
+fn replace_webp_exif() {
+    inject_webp_exif(
         "P1133897.webp",
-        "P1133897_AdobeRGB_exif.out.webp",
+        "P1133897_AdobeRGB_exif.webp",
         "P1133897_AdobeRGB.exif",
     );
 }
@@ -59,12 +59,12 @@ fn extract_webp_image(input: &str, exif: Option<&str>) {
     }
 }
 
-fn inject_webp_result(input: &str, output: &str, exif: &str) {
+fn inject_webp_exif(input: &str, output: &str, exif: &str) {
     let file = Bytes::from(fs::read(format!("tests/images/{}", input)).expect("read webp"));
-    let icc = Bytes::from(fs::read(format!("tests/images/{}", exif)).expect("read exif"));
+    let exif = Bytes::from(fs::read(format!("tests/images/{}", exif)).expect("read exif"));
 
     let mut webp = WebP::from_bytes(file).expect("parse webp");
-    webp.set_exif(Some(icc));
+    webp.set_exif(Some(exif));
 
     let out = webp.encoder().bytes();
 
