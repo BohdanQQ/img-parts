@@ -75,12 +75,32 @@ impl WebP {
     }
 
     fn infer_kind(&self) -> VP8Kind {
-        if self.has_chunk(CHUNK_ICCP) | self.has_chunk(CHUNK_EXIF) {
+        if self.has_chunk(CHUNK_ICCP)
+            || self.has_chunk(CHUNK_EXIF)
+            || self.has_chunk(CHUNK_ALPH)
+            || self.has_chunk(CHUNK_ANIM)
+            || self.has_chunk(CHUNK_ANMF)
+            || self.has_chunk(CHUNK_XMP)
+        {
             VP8Kind::VP8X
         } else {
             // TODO: VP8L
             VP8Kind::VP8
         }
+    }
+
+    fn construct_vp8x_chunk(&self) -> RiffChunk {
+        let (width, height) = self.dimensions().unwrap();
+        let flags = WebPFlags::from_webp(self);
+        let mut content = BytesMut::with_capacity(10);
+
+        content.extend_from_slice(&flags.0);
+
+        let buf = u24_to_le_bytes(width - 1);
+        content.extend_from_slice(&buf);
+        let buf = u24_to_le_bytes(height - 1);
+        content.extend_from_slice(&buf);
+        RiffChunk::new(CHUNK_VP8X, RiffContent::Data(content.freeze()))
     }
 
     fn convert_into_infered_kind(&mut self) {
@@ -89,7 +109,12 @@ impl WebP {
 
         if current_kind == correct_kind {
             if correct_kind == VP8Kind::VP8X {
-                // TODO: update flags in the VP8X chunk
+                let chunk = self.construct_vp8x_chunk();
+                for c in self.chunks_mut() {
+                    if c.id() == CHUNK_VP8X {
+                        *c = chunk.clone();
+                    }
+                }
             }
         } else if correct_kind == VP8Kind::VP8 {
             self.remove_chunks_by_id(CHUNK_VP8X);
@@ -102,19 +127,7 @@ impl WebP {
                 .position(|chunk| chunk.id() == CHUNK_ICCP)
                 .unwrap_or(0);
 
-            let (width, height) = self.dimensions().unwrap();
-
-            let flags = WebPFlags::from_webp(self);
-            let mut content = BytesMut::with_capacity(10);
-
-            content.extend_from_slice(&flags.0);
-
-            let buf = u24_to_le_bytes(width - 1);
-            content.extend_from_slice(&buf);
-            let buf = u24_to_le_bytes(height - 1);
-            content.extend_from_slice(&buf);
-
-            let chunk = RiffChunk::new(CHUNK_VP8X, RiffContent::Data(content.freeze()));
+            let chunk = self.construct_vp8x_chunk();
             self.chunks_mut().insert(pos, chunk);
         }
     }
@@ -127,7 +140,7 @@ impl WebP {
     pub fn dimensions(&self) -> Option<(u32, u32)> {
         if let Some(vp8x) = self.chunk_by_id(CHUNK_VP8X) {
             if let Some(data) = vp8x.content().data() {
-                if let Some(range) = data.get(2..8) {
+                if let Some(range) = data.get(4..10) {
                     let width = u24_from_le_bytes(range[0..3].try_into().unwrap()) + 1;
                     let height = u24_from_le_bytes(range[3..6].try_into().unwrap()) + 1;
                     return Some((width, height));
