@@ -23,7 +23,6 @@ impl WebPFlags {
         if webp.has_chunk(CHUNK_ANIM) || webp.has_chunk(CHUNK_ANMF) {
             flags.0[0] |= 0b0000_0010;
         }
-        println!("VP8X: {flags:?}");
         flags
     }
 }
